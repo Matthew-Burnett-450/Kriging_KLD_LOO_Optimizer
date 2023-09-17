@@ -3,42 +3,17 @@ import matplotlib.pyplot as plt
 from scipy.optimize import minimize
 from scipy import linalg
 import time
+from Variograms_Trendfuncs import *
 
 class OrdinaryKrigning:
-    def __init__(self,Points,Zvals,Variogram='gaussian'):
+    def __init__(self,Points,Zvals,Variogram=GaussianVariogram()):
         self.points=Points
         self.zvals=Zvals
         self.variogram=Variogram
         #immutable instance of the Z coordanites
         self.zvals_org = np.copy(self.zvals)
-#__todo___________
-# turn into hasmap for faster lookup    
-    #variogram selector
-        if self.variogram == 'gaussian':
-            def Variogram(h, a, C):
-                # Gaussian model with sill C and range a
-                return C * (1 - np.exp(-1*((h/a)**2)))
-        elif self.variogram == 'spherical': 
-            def Variogram(h, a, C):
-                # Spherical model with sill C and range a
-                return C * (1 - ((3/2) * (h/a) - (1/2) * (h/a)**3))  
-        elif self.variogram == 'exponential':
-            def Variogram(h, a, C):
-                # Exponential model with sill C and range a
-                return C * (1 - np.exp(-h/a))
-        elif self.variogram == 'linear':
-            def Variogram(h, a, C):
-                # Linear model with sill C and range a
-                return C * (h/a)
-        elif self.variogram == 'power':
-            def Variogram(h, a, C):
-                # Power model with sill C, range a
-                return C * (h/a)**2
-        else:
-            print('No valid variogram model selected')
-            quit()
 
-        self.vVariogram = np.vectorize(Variogram,otypes=[float])
+        self.vVariogram=Variogram
 
 
 
@@ -55,7 +30,8 @@ class OrdinaryKrigning:
         distances = np.sqrt((self.points[:, None, 0] - self.points[None, :, 0]) ** 2 + 
                     (self.points[:, None, 1] - self.points[None, :, 1]) ** 2 / self.anisotropy_factor ** 2)
 
-        result = self.vVariogram(distances, self.a,self.C)
+        self.vVariogram.set_a_C(self.a,self.C)
+        result=self.vVariogram(distances)
 
         # Add a row of ones at the bottom and a column of ones at the right
         result = np.pad(result, ((0, 1), (0, 1)), mode='constant', constant_values=1)
@@ -77,11 +53,15 @@ class OrdinaryKrigning:
 
         distances_to_point0 = np.sqrt((training_points[:, 0] - Xo) ** 2 + (training_points[:, 1] - Yo) ** 2 / self.anisotropy_factor ** 2)
 
-        vectorb = self.vVariogram(distances_to_point0, self.a,self.C)
+        #_____can probably be removed but this is more safe, if run time affect to large can be removed_______#
+        #self.vVariogram.set_a_C(self.a,self.C)
+        #____________________________________________________________________________________________________#
+
+        vectorb=self.vVariogram(distances_to_point0)
 
         vectorb = np.append(vectorb, 1)
 
-        lamd=linalg.solve(self.result,vectorb,assume_a='sym')
+        lamd=linalg.solve(self.result,vectorb)
 
         lamd=np.delete(lamd,-1)
 
@@ -112,21 +92,8 @@ class OrdinaryKrigning:
         return std_dev
     
     def interpgrid(self, xmin, xmax, ymin, ymax, step):
-        def __guess(point0):
-            distances_to_point0 = np.sqrt(np.sum((self.points - point0) ** 2, axis=1))
 
-            vectorb = self.vVariogram(distances_to_point0, self.a,self.C)
-
-            vectorb = np.append(vectorb, 1)
-
-            lamd = np.linalg.solve(self.result, vectorb)
-
-            lamd = np.delete(lamd, -1)
-
-            self.zarray = np.dot(lamd, self.zvals.T) 
-            return self.zarray 
-        
-        SingleGuess = np.vectorize(__guess, signature='(n)->()',otypes=[float])
+        SingleGuess = np.vectorize(self.SinglePoint,otypes=[float])
 
         x_range = np.arange(xmin, xmax, step)
         y_range = np.arange(ymin, ymax, step)
@@ -137,7 +104,7 @@ class OrdinaryKrigning:
         # Stack the points into a 2D array
         points_to_estimate = np.column_stack((X.flatten(), Y.flatten()))
 
-        z = SingleGuess(points_to_estimate)
+        z = SingleGuess(points_to_estimate[:,0],points_to_estimate[:,1])
 
         z = z.reshape(X.shape)
 
@@ -151,12 +118,8 @@ class OrdinaryKrigning:
 
         self.ManualParamSet(*InitialParams)
         self.params=InitialParams 
-#_______________to Do_____________________
-#add a quicker option LOO is too slow for some things
-#probably a traditional R2 funciton
-#needs to ouput a residual
+        
         def calc_r_squared_LOO(params):    
-            C, a, nugget, anisotropy_factor = params
             predictions = []
             for i in range(len(self.points)):
                 model = OrdinaryKrigning(np.delete(self.points, i, axis=0), np.delete(self.zvals, i),Variogram=self.variogram)
@@ -171,7 +134,7 @@ class OrdinaryKrigning:
             return 1 - self.LOOr2  # We subtract from 1 because we want to minimize the function
 
         # Perform the optimization
-        result = minimize(calc_r_squared_LOO, self.params,method='L-BFGS-B')
+        result = minimize(calc_r_squared_LOO, self.params,method='L-BFGS-B',options={'maxiter':3})
         C_opt, a_opt, nugget_opt, anisotropy_factor_opt = result.x
         self.a=a_opt
         self.anisotropy_factor=anisotropy_factor_opt
@@ -194,7 +157,6 @@ class OrdinaryKrigning:
 
         t1 = time.time()
         self.exetime = t1-t0
-        print(self.exetime)
         return self.zarray
     
 
@@ -260,7 +222,6 @@ class UniversalKriging(OrdinaryKrigning):
         }
         #error handling
         if trendfunc not in trend_functions:
-            print('No valid trend function selected')
             quit()
         #assign var for calc_trend step
         self.trend_func = trend_functions[trendfunc]['func']

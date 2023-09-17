@@ -64,7 +64,7 @@ def run_test(disp=False):
     terrain = generate_terrain(width=10, height=10, scale=np.random.uniform(low=.01,high=.02), octaves=np.random.randint(low=15,high=25), persistence=.1, sigma=2,z=10)
     points,zpoints=sample_points(terrain=terrain,num_points=10)    
 
-    kld=SpacialSensitivityAnalysisUK(points,zpoints,Variogram='exponential',trendfunc='cubic',radius=1)
+    kld=SpacialSensitivityAnalysisUK(points,zpoints,Variogram=ExponentialVariogram,trendfunc='cubic',radius=1)
     zmap=kld.AutoKrige(step=1,bounds=[0,10,0,10])
     kld.DiverganceLOO(step=1,manualbounds=[0,10,0,10])
     mse=np.mean((terrain-zmap.T)**2)
