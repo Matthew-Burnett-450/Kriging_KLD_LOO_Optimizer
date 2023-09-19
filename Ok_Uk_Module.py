@@ -5,6 +5,7 @@ from scipy import linalg
 import time
 from Variograms_Trendfuncs import *
 
+
 class OrdinaryKrigning:
     def __init__(self,Points,Zvals,Variogram=GaussianVariogram()):
         self.points=Points
@@ -27,9 +28,10 @@ class OrdinaryKrigning:
 
     def Matrixsetup(self):
         # Compute the pairwise distance matrix
-        distances = np.sqrt((self.points[:, None, 0] - self.points[None, :, 0]) ** 2 + 
-                    (self.points[:, None, 1] - self.points[None, :, 1]) ** 2 / self.anisotropy_factor ** 2)
 
+        #_______Make this go brrrrrrr______#
+        distances = numba_dist_matrix(self.points)
+        #__________________________________#
         self.vVariogram.set_a_C(self.a,self.C)
         result=self.vVariogram(distances)
 
@@ -49,9 +51,8 @@ class OrdinaryKrigning:
         if training_points is None:
             training_points = self.points
 
-        point0 = np.array([Xo, Yo])
 
-        distances_to_point0 = np.sqrt((training_points[:, 0] - Xo) ** 2 + (training_points[:, 1] - Yo) ** 2 / self.anisotropy_factor ** 2)
+        distances_to_point0 = numba_distances_to_point0(self.points, Xo, Yo)
 
         #_____can probably be removed but this is more safe, if run time affect to large can be removed_______#
         #self.vVariogram.set_a_C(self.a,self.C)
@@ -92,7 +93,7 @@ class OrdinaryKrigning:
         return std_dev
     
     def interpgrid(self, xmin, xmax, ymin, ymax, step):
-
+        start=time.time()
         SingleGuess = np.vectorize(self.SinglePoint,otypes=[float])
 
         x_range = np.arange(xmin, xmax, step)
@@ -107,19 +108,23 @@ class OrdinaryKrigning:
         z = SingleGuess(points_to_estimate[:,0],points_to_estimate[:,1])
 
         z = z.reshape(X.shape)
+        end=time.time()
 
+        print(f"Interp grid time {end-start}")
         return z
     
-
+    
 
     def AutoOptimize(self, InitialParams=None):
+        globaltime=[]
         if InitialParams is None:
             InitialParams = [np.var(self.zvals), np.max(np.sqrt(np.sum((self.points[:, None, :] - self.points[None, :, :]) ** 2, axis=-1)))/2, .001, 1]
 
         self.ManualParamSet(*InitialParams)
         self.params=InitialParams 
         
-        def calc_r_squared_LOO(params):    
+        def calc_r_squared_LOO(params):   
+            start2=time.time() 
             predictions = []
             for i in range(len(self.points)):
                 model = OrdinaryKrigning(np.delete(self.points, i, axis=0), np.delete(self.zvals, i),Variogram=self.variogram)
@@ -130,9 +135,11 @@ class OrdinaryKrigning:
             correlation_matrix = np.corrcoef(predictions, self.zvals)
             correlation_xy = correlation_matrix[0,1]
             self.LOOr2 = correlation_xy**2
-            
+            end2=time.time()
+            globaltime.append(end2-start2)
             return 1 - self.LOOr2  # We subtract from 1 because we want to minimize the function
 
+        
         # Perform the optimization
         result = minimize(calc_r_squared_LOO, self.params,method='L-BFGS-B',options={'maxiter':3})
         C_opt, a_opt, nugget_opt, anisotropy_factor_opt = result.x
@@ -140,6 +147,7 @@ class OrdinaryKrigning:
         self.anisotropy_factor=anisotropy_factor_opt
         self.C=C_opt
         self.nugget=nugget_opt
+        print(sum(globaltime))
     
 
 
