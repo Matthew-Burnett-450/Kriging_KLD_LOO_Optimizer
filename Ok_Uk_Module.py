@@ -30,17 +30,13 @@ class OrdinaryKrigning:
     def Matrixsetup(self):
         # Compute the pairwise distance matrix
 
-        #_______Make this go brrrrrrr______#
+       
         distances = numba_dist_matrix(self.points)
-        #__________________________________#
+        
         self.vVariogram.set_a_C(self.a,self.C)
         result=self.vVariogram(distances)
 
-        # Add a row of ones at the bottom and a column of ones at the right
-
-
         result = result + np.eye(result.shape[0]) * self.nugget
-
 
         self.lu, self.piv = scipy.linalg.lu_factor(result)
 

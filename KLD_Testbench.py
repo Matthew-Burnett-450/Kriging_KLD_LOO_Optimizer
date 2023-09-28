@@ -90,7 +90,7 @@ def find_filtered_centroid(array_2d, max_x, max_y):
 
 def run_test(disp=False,num_points=1,width=30,height=30):
     start=time.time()
-    terrain = generate_terrain(width=width, height=height, scale=np.random.uniform(low=.01,high=.02), octaves=np.random.randint(low=15,high=25), persistence=.1, sigma=2,z=10)
+    terrain = generate_terrain(width=width, height=height, scale=np.random.uniform(low=.01,high=.02), octaves=np.random.randint(low=3,high=8), persistence=.1, sigma=1,z=10)
     points,zpoints=sample_points(terrain=terrain,num_points=num_points)    
 
     kld=SpacialSensitivityAnalysisOK(points,zpoints,Variogram=ExponentialVariogram(),radius=1)
@@ -246,13 +246,13 @@ def run_next(inpoints,inzpoints,terrain,nextpoint,i,disp=False,width=30,height=3
 
     return terrain,points,zpoints,np.array(find_filtered_centroid(Z,width,height))
     
-terrain,outpoints,zpoints,nextpoints=run_test(disp=True,num_points=1,width=30,height=30)
+terrain,outpoints,zpoints,nextpoints=run_test(disp=True,num_points=1,width=100,height=100)
 nsteps=5+5
 for i in range(nsteps):
     
     if i ==nsteps-1:
-        terrain,outpoints,zpoints,nextpoints=run_next(outpoints,zpoints,terrain,nextpoints,i,disp=True,width=30,height=30)
+        terrain,outpoints,zpoints,nextpoints=run_next(outpoints,zpoints,terrain,nextpoints,i,disp=True,width=100,height=100)
     else:
-        terrain,outpoints,zpoints,nextpoints=run_next(outpoints,zpoints,terrain,nextpoints,i,disp=True,width=30,height=30)
+        terrain,outpoints,zpoints,nextpoints=run_next(outpoints,zpoints,terrain,nextpoints,i,disp=True,width=100,height=100)
 
-terrain,outpoints,zpoints,nextpoints=run_test(disp=True,num_points=6+5,width=30,height=30)
+terrain,outpoints,zpoints,nextpoints=run_test(disp=True,num_points=6+5,width=100,height=100)

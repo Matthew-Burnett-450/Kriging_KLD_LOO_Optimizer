@@ -4,7 +4,7 @@ import time
 import tensorflow as tf
 from numba import jit,vectorize,float32
 import scipy.linalg
-
+from scipy.spatial import distance
 
 def run_on_gpu():
     with tf.device('/gpu:0'):
@@ -86,78 +86,30 @@ class GaussianVariogram(__VariogramWrapper):
         return self.gaussian_variogram(h)
 
 
-@jit(fastmath=True,forceobj=True)
 def numba_dist_matrix(points):
-    num_atoms = len(points)
-    
-    # Create expanded arrays for broadcasting
-    points_expanded1 = points[:, np.newaxis, :]
-    points_expanded2 = points[np.newaxis, :, :]
-    
-    # Compute the difference
-    diff = points_expanded1 - points_expanded2
-    
-    # Reshape to 2D array to use with np.linalg.norm
-    diff_reshaped = diff.reshape(-1, diff.shape[-1])
-    
-    # Compute the norm (Euclidean distance)
-    dist_reshaped = np.linalg.norm(diff_reshaped, axis=1)
-    
-    # Reshape back to original 2D matrix shape
-    dmat = dist_reshaped.reshape(num_atoms, num_atoms)
-    
-    return dmat
+    return distance.cdist(points, points, 'euclidean')
 
-@jit(fastmath=True, forceobj=True)
 def numba_distances_to_point0(points, Xo, Yo):
-    # Single point to a 2D shape for broadcasting
-    single_point = np.array([Xo, Yo])[np.newaxis, :]
+    single_point = np.array([[Xo, Yo]])
     
-    # Compute the differences between the single point and all other points
-    diff = single_point - points
-    
-    # Compute the norm (Euclidean distance) for each pair
-    distances_to_point0 = np.linalg.norm(diff, axis=1)
+    # Compute distances from a single point to all other points using cdist
+    distances_to_point0 = distance.cdist(single_point, points, 'euclidean').flatten()
     
     return distances_to_point0
 
 
 
-"""
+
    
 n=10000
 
 
-        
-np.random.seed(69) # Seed for reproducibility
-# Sample points for testing
-
-sample_points = np.random.rand(n, 2)
-print(np.shape(sample_points))
-# Run the function locally to get the distance matrix
-start=time.time()
-matrix=numba_dist_matrix(sample_points)
-end=time.time()
-print('_______Distance_Matrix_______')
-print(f'{end-start}s total')
-print(f'{(end-start)/(n)*10**6}μs per point')
-
-#____Benchmarking____#
 
 
-variogram=GaussianVariogram(100,5)
 
-start2=time.time()
-Cmatrix=variogram(matrix.astype(np.float16))
-end2=time.time()
-print('________Variogram____________')
-print(f'{(end2-start2)/(np.shape(matrix)[0]*np.shape(matrix)[1])*10**6} μs')
-print(f'{np.shape(matrix)[0]*np.shape(matrix)[1]} elements')
 
-print('_______Total_________________')
-print(end2-start)
-print(f'{(end2-start)/(n)*10**6} μs per point')"""
-"""
+
+
 @jit(fastmath=True, forceobj=True)
 def expand_dist_matrix_with_point(dmat, points, Xo, Yo):
     num_atoms = dmat.shape[0]
@@ -178,7 +130,7 @@ def expand_dist_matrix_with_point(dmat, points, Xo, Yo):
     # Fill in the last cell (distance to itself)
     new_dmat[-1, -1] = 0.0
 
-    return new_dmat"""
+    return new_dmat
 
 
 
