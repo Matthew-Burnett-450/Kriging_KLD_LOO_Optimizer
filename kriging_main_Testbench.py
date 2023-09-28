@@ -7,15 +7,11 @@ from matplotlib import pyplot as plt
 #colum_defs
 xi_col=0
 yi_col=1
-zi_col=3
+zi_col=4
 #resolution
-resolution=20
+resolution=30
 #kriging config
 Params=[]
-
-
-
-    #plotting
 saveplot=True
 
 
@@ -29,4 +25,4 @@ end=time.time()
 krige.Plot(f'Side SA_Power_Variogram_OK r2={round(krige.LOOr2,2)} aspect={krige.anisotropy_factor}',xtitle='Power',ytitle='Speed',saveplot=saveplot,address=f'figs',extent=[0, 900, 0, 5000])
 print(krige.LOOr2)
 print(krige.params)
-print(end-start)
+print(f"total: {end-start}")

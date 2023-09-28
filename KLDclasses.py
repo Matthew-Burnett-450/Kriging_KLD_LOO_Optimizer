@@ -23,18 +23,22 @@ class SpacialSensitivityAnalysisOK(OrdinaryKrigning):
         distances = np.linalg.norm(self.points - point, axis=1)
         neighbors_indices = np.where(distances <= radius)[0]
         return np.delete(self.points, neighbors_indices, axis=0), np.delete(self.zvals, neighbors_indices)
-
-    def DiverganceLOO(self,step=10):
+    
+    def DiverganceLOO(self,step=10,manualbounds=None):
 
         #set up the initial kriging model
         params=[self.C, self.a, self.nugget, self.anisotropy_factor]
         self.divscores=[]
+        if manualbounds==None:
+            bounds=[np.max(self.points[:,0]),np.min(self.points[:,0]),np.max(self.points[:,1]),np.min(self.points[:,1])]
+        else:
+            bounds=manualbounds
         #LOO cross validation loop
         for i in range(len(self.points)):
-            new_points, new_zvals = self.remove_neighbors(i, self.radius)
             print('Iterations: ',i+1,'/',len(self.points)+1)
-            model = OrdinaryKrigning(new_points,new_zvals,Variogram=self.variogram)
-            estimate = model.AutoKrige(step=step,bounds=[np.max(self.points[:,0]),np.min(self.points[:,0]),np.max(self.points[:,1]),np.min(self.points[:,1])])
+            new_points, new_zvals = self.remove_neighbors(i, self.radius)
+            model = OrdinaryKrigning(new_points, new_zvals,Variogram=self.variogram)
+            estimate = model.AutoKrige(step=step,bounds=bounds)
             self.divscores.append((np.mean(self.DivModel(np.abs(self.zarray/np.sum(self.zarray)),np.abs(estimate/np.sum(estimate))))))
         np.save('div_scores.npy', self.divscores)
         return self.divscores

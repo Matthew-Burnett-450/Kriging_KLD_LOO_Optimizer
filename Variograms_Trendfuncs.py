@@ -3,6 +3,8 @@ import numpy as np
 import time
 import tensorflow as tf
 from numba import jit,vectorize,float32
+import scipy.linalg
+
 
 def run_on_gpu():
     with tf.device('/gpu:0'):
@@ -121,17 +123,17 @@ def numba_distances_to_point0(points, Xo, Yo):
 
 
 
-
-"""        
-n=1000
-listofns=[5,10,20,50,100,200,1000,2000,3000,5000]
+"""
+   
+n=10000
 
 
         
-np.random.seed(80085069) # Seed for reproducibility
+np.random.seed(69) # Seed for reproducibility
 # Sample points for testing
 
-sample_points = np.random.rand(n, 2,)
+sample_points = np.random.rand(n, 2)
+print(np.shape(sample_points))
 # Run the function locally to get the distance matrix
 start=time.time()
 matrix=numba_dist_matrix(sample_points)
@@ -149,10 +151,35 @@ start2=time.time()
 Cmatrix=variogram(matrix.astype(np.float16))
 end2=time.time()
 print('________Variogram____________')
-print(end2-start2)
 print(f'{(end2-start2)/(np.shape(matrix)[0]*np.shape(matrix)[1])*10**6} μs')
 print(f'{np.shape(matrix)[0]*np.shape(matrix)[1]} elements')
 
 print('_______Total_________________')
 print(end2-start)
 print(f'{(end2-start)/(n)*10**6} μs per point')"""
+"""
+@jit(fastmath=True, forceobj=True)
+def expand_dist_matrix_with_point(dmat, points, Xo, Yo):
+    num_atoms = dmat.shape[0]
+    
+    # Pre-allocate memory for new_dmat
+    new_dmat = np.empty((num_atoms + 1, num_atoms + 1))
+    
+    # Fill in the old distance matrix
+    new_dmat[:num_atoms, :num_atoms] = dmat
+    
+    # Compute distances from the new point to all other points
+    dists = numba_distances_to_point0(points, Xo, Yo)
+    
+    # Fill in the last row and last column
+    new_dmat[-1, :num_atoms] = dists
+    new_dmat[:num_atoms, -1] = dists
+    
+    # Fill in the last cell (distance to itself)
+    new_dmat[-1, -1] = 0.0
+
+    return new_dmat"""
+
+
+
+

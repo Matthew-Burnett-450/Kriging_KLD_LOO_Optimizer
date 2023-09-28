@@ -4,6 +4,7 @@ from scipy.optimize import minimize
 from scipy import linalg
 import time
 from Variograms_Trendfuncs import *
+import scipy.linalg
 
 
 class OrdinaryKrigning:
@@ -36,37 +37,29 @@ class OrdinaryKrigning:
         result=self.vVariogram(distances)
 
         # Add a row of ones at the bottom and a column of ones at the right
-        result = np.pad(result, ((0, 1), (0, 1)), mode='constant', constant_values=1)
 
-        # Replace the bottom-right corner with 0
-        result[-1, -1] = 0
 
         result = result + np.eye(result.shape[0]) * self.nugget
+
+
+        self.lu, self.piv = scipy.linalg.lu_factor(result)
+
 
         self.result=result
 
 
 
-    def SinglePoint(self,Xo,Yo,training_points=None):
+    def SinglePoint(self, Xo, Yo, training_points=None):
         if training_points is None:
             training_points = self.points
 
+        vectorb = self.vVariogram(numba_distances_to_point0(self.points, Xo, Yo))
 
-        distances_to_point0 = numba_distances_to_point0(self.points, Xo, Yo)
+        # Use the precomputed LU decomposition to solve the system
 
-        #_____can probably be removed but this is more safe, if run time affect to large can be removed_______#
-        #self.vVariogram.set_a_C(self.a,self.C)
-        #____________________________________________________________________________________________________#
+        x = scipy.linalg.lu_solve((self.lu, self.piv), vectorb)
+        zout = np.dot(x, self.zvals.T)
 
-        vectorb=self.vVariogram(distances_to_point0)
-
-        vectorb = np.append(vectorb, 1)
-
-        lamd=linalg.solve(self.result,vectorb)
-
-        lamd=np.delete(lamd,-1)
-
-        zout=np.dot(lamd,self.zvals.T)
         return zout
         
 #___________to be implemented_____________________
@@ -147,7 +140,7 @@ class OrdinaryKrigning:
         self.anisotropy_factor=anisotropy_factor_opt
         self.C=C_opt
         self.nugget=nugget_opt
-        print(sum(globaltime))
+        print(f"Optimizer time {sum(globaltime)}")
     
 
 
